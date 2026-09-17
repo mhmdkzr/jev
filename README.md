@@ -1,6 +1,8 @@
 # Jev
 
-A Go client for [TypeSafe](https://typesafe.ai)'s System One Jev model.
+A Go client for [TypeSafe](https://typesafe.ai)'s System One Jev model. See the
+[TypeSafe documentation](https://docs.typesafe.ai/) for details on the API and
+the Jev model.
 
 The client sends a `state` plus a set of typed **questions** and gets back one
 typed **answer** per question. Question ids are programmer handles: you build a
