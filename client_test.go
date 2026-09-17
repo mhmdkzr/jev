@@ -343,7 +343,7 @@ func TestBuilderIsImmutable(t *testing.T) {
 
 func TestNilContextRejected(t *testing.T) {
 	client := newTestClient(t, "http://127.0.0.1:1")
-	_, err := client.NewRequest().WithContext(nil).State("s").Question(Noul("q", "Is it?")).Send()
+	_, err := client.NewRequest().WithContext(t.Context()).State("s").Question(Noul("q", "Is it?")).Send()
 	if !errors.Is(err, ErrNilContext) {
 		t.Fatalf("err = %v, want ErrNilContext", err)
 	}
@@ -400,10 +400,8 @@ func TestConcurrentReadsAreSafe(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 8 {
+		wg.Go(func() {
 			answer, err := result.Get(question)
 			if err != nil {
 				t.Errorf("Get: %v", err)
@@ -412,7 +410,7 @@ func TestConcurrentReadsAreSafe(t *testing.T) {
 			if answer.Yes != 0.92 {
 				t.Errorf("noul = %v", answer.Yes)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

@@ -3,6 +3,7 @@ package jev
 import (
 	"errors"
 	"fmt"
+	"maps"
 )
 
 // NoulAnswer is the answer to a [NoulQuestion]. Yes is the probability the
@@ -168,9 +169,7 @@ func cloneFloat64Map(m map[string]float64) map[string]float64 {
 		return nil
 	}
 	out := make(map[string]float64, len(m))
-	for key, value := range m {
-		out[key] = value
-	}
+	maps.Copy(out, m)
 	return out
 }
 
@@ -179,8 +178,6 @@ func cloneValueMap(m map[string]Value) map[string]Value {
 		return nil
 	}
 	out := make(map[string]Value, len(m))
-	for key, value := range m {
-		out[key] = value
-	}
+	maps.Copy(out, m)
 	return out
 }

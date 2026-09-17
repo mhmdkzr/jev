@@ -82,8 +82,8 @@ func NewClient(options ...Option) (*Client, error) {
 		return nil, fmt.Errorf("jev: invalid base URL %q", cfg.baseURL)
 	}
 	basePath := strings.TrimRight(baseURL.Path, "/")
-	if strings.HasSuffix(basePath, endpointPath) {
-		basePath = strings.TrimSuffix(basePath, endpointPath)
+	if before, ok := strings.CutSuffix(basePath, endpointPath); ok {
+		basePath = before
 	}
 	baseURL.Path = basePath
 	root := baseURL.String()
