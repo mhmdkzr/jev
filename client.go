@@ -371,7 +371,7 @@ func (c *Client) do(ctx context.Context, method, endpoint string, payload []byte
 
 		response, err := c.httpClient.Do(request)
 		if err != nil {
-			if !c.retryable(attempt, 0) {
+			if !c.retryable(attempt, nil) {
 				return nil, nil, fmt.Errorf("jev: request failed: %w", err)
 			}
 			if err := c.backoff(ctx, attempt, 0); err != nil {
@@ -395,7 +395,7 @@ func (c *Client) do(ctx context.Context, method, endpoint string, payload []byte
 		}
 
 		apiErr := newAPIError(response, responseBody)
-		if !c.retryable(attempt, response.StatusCode) {
+		if !c.retryable(attempt, apiErr) {
 			return nil, nil, apiErr
 		}
 		retryAfter := parseRetryAfter(response.Header.Get("Retry-After"))
@@ -408,20 +408,16 @@ func (c *Client) do(ctx context.Context, method, endpoint string, payload []byte
 	}
 }
 
-func (c *Client) retryable(attempt, statusCode int) bool {
+// retryable reports whether another attempt is allowed for the given failure.
+// A nil apiErr is a transport error, which is always worth retrying.
+func (c *Client) retryable(attempt int, apiErr *APIError) bool {
 	if attempt >= c.maxRetries {
 		return false
 	}
-	switch {
-	case statusCode == 0:
+	if apiErr == nil {
 		return true
-	case statusCode == http.StatusTooManyRequests, statusCode == 529:
-		return true
-	case statusCode >= 500 && statusCode <= 599:
-		return true
-	default:
-		return false
 	}
+	return apiErr.Retryable()
 }
 
 func (c *Client) backoff(ctx context.Context, attempt int, retryAfter time.Duration) error {

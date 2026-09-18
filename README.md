@@ -9,7 +9,8 @@ typed **answer** per question. Question ids are programmer handles: you build a
 question, keep the value, and read its answer back from the result without
 string keys or type assertions.
 
-See the [TypeSafe documentation](https://docs.typesafe.ai/) for details on the API and the Jev model.
+See the [TypeSafe documentation](https://docs.typesafe.ai/) for details on the 
+API and the Jev model.
 
 ## Install
 
@@ -73,10 +74,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	
 	departmentAnswer, err := result.Get(department)
 	if err != nil {
 		log.Fatal(err)
 	}
+	
 	frustrationAnswer, err := result.Get(frustration)
 	if err != nil {
 		log.Fatal(err)
@@ -214,10 +217,12 @@ noul, err := result.Get(isUrgent) // NoulAnswer inferred
 if err != nil {
 	log.Fatal(err)
 }
+
 choice, err := result.Get(department)
 if err != nil {
 	log.Fatal(err)
 }
+
 score, err := result.Get(frustration)
 if err != nil {
 	log.Fatal(err)
@@ -326,25 +331,30 @@ with exponential backoff and jitter, honoring a `Retry-After` header. Each
 logical request carries a stable `Idempotency-Key` that is reused across
 retries, so a retried request is not evaluated twice.
 
-Non-2xx responses return an `*APIError`:
+Non-2xx responses return an `*APIError`. Branch on the sentinel that matches
+the status with `errors.Is`, or inspect the `*APIError` directly:
 
 ```go
 result, err := client.NewRequest().State(state).Question(question).Send()
 if err != nil {
+	switch {
+	case errors.Is(err, jev.ErrAuth): // 401/403: missing or invalid API key
+	case errors.Is(err, jev.ErrInvalidRequest): // 400/422: failed validation
+	case errors.Is(err, jev.ErrRateLimit): // 429: rate limit exceeded
+	case errors.Is(err, jev.ErrOverloaded): // 529: temporarily overloaded
+	}
+
 	var apiErr *jev.APIError
 	if errors.As(err, &apiErr) {
-		switch {
-		case apiErr.Unauthorized(): // 401: missing or invalid API key
-		case apiErr.Unprocessable(): // 422: request failed validation
-		case apiErr.RateLimited(): // 429: rate limit exceeded
-		case apiErr.Overloaded(): // 529: temporarily overloaded
-		}
 		fmt.Println(apiErr.StatusCode, apiErr.Message, apiErr.RequestID, string(apiErr.Body))
+		fmt.Println(apiErr.Unauthorized(), apiErr.Unprocessable(), apiErr.Retryable())
 	}
 }
 ```
 
 `NewClient` returns `jev.ErrMissingAPIKey` when no API key is configured.
+`Send` returns `jev.ErrNilClient`, `jev.ErrNilContext`, or `jev.ErrInvalidValue`
+for a nil client, a nil context, or an uninitialized `Value`.
 
 ## License
 

@@ -146,6 +146,51 @@ func TestEvalReturnsAPIError(t *testing.T) {
 	}
 }
 
+func TestAPIErrorMatchesSentinelErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		want   error
+	}{
+		{"unauthorized", http.StatusUnauthorized, ErrAuth},
+		{"forbidden", http.StatusForbidden, ErrAuth},
+		{"bad request", http.StatusBadRequest, ErrInvalidRequest},
+		{"unprocessable", http.StatusUnprocessableEntity, ErrInvalidRequest},
+		{"rate limit", http.StatusTooManyRequests, ErrRateLimit},
+		{"overloaded", StatusOverloaded, ErrOverloaded},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(`{"message": "nope"}`))
+			}))
+			defer server.Close()
+
+			client, err := NewClient(
+				WithAPIKey("test-key"),
+				WithBaseURL(server.URL),
+				WithMaxRetries(0),
+			)
+			if err != nil {
+				t.Fatalf("NewClient: %v", err)
+			}
+			_, err = client.NewRequest().State("s").Question(Noul("q", "Is it?")).Send()
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("errors.Is(%v, %v) = false, want true", err, tt.want)
+			}
+
+			var apiErr *APIError
+			if !errors.As(err, &apiErr) {
+				t.Fatalf("error = %T, want *APIError", err)
+			}
+			if apiErr.Retryable() != (tt.status == http.StatusTooManyRequests || tt.status == StatusOverloaded) {
+				t.Errorf("Retryable() = %v for status %d", apiErr.Retryable(), tt.status)
+			}
+		})
+	}
+}
+
 func TestEvalRetriesWithStableIdempotencyKey(t *testing.T) {
 	var calls int
 	var keys []string
@@ -343,7 +388,7 @@ func TestBuilderIsImmutable(t *testing.T) {
 
 func TestNilContextRejected(t *testing.T) {
 	client := newTestClient(t, "http://127.0.0.1:1")
-	_, err := client.NewRequest().WithContext(t.Context()).State("s").Question(Noul("q", "Is it?")).Send()
+	_, err := client.NewRequest().WithContext(nil).State("s").Question(Noul("q", "Is it?")).Send()
 	if !errors.Is(err, ErrNilContext) {
 		t.Fatalf("err = %v, want ErrNilContext", err)
 	}
